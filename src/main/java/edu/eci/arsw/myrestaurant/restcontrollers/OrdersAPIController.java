@@ -20,18 +20,23 @@ import com.google.gson.Gson;
 import edu.eci.arsw.myrestaurant.model.Order;
 import edu.eci.arsw.myrestaurant.model.ProductType;
 import edu.eci.arsw.myrestaurant.model.RestaurantProduct;
+import edu.eci.arsw.myrestaurant.services.OrderServicesException;
 import edu.eci.arsw.myrestaurant.services.RestaurantOrderServices;
 import edu.eci.arsw.myrestaurant.services.RestaurantOrderServicesStub;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -41,25 +46,85 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * @author hcadavid
  */
+@RestController
+@RequestMapping(value = "/orders")
 public class OrdersAPIController {
 
- @Service   
- @RestController
- @RequestMapping(value = "/orders")
- public class OrderController {
-  
-         @Autowired
-         RestaurantOrderServices restaurant;
+    @Autowired
+    RestaurantOrderServices restaurant;
+
+    @RequestMapping(method = RequestMethod.GET)
+    public ResponseEntity<?> getOrders() {
+        Gson json = new Gson();
+        HashMap<Integer, Order> map = new HashMap<>();
+        Set<Integer> tables = restaurant.getTablesWithOrders();
+        //---------//
+        tables.forEach((i) -> {
+            map.put(i, restaurant.getTableOrder(i));
+        });
+        String p = json.toJson(map);
+        return new ResponseEntity<>(p, HttpStatus.OK);
+    }
+
+    @RequestMapping(method = RequestMethod.GET, path = "/{id}")
+    public ResponseEntity<?> getOrderByTable(@PathVariable("id") int id) {
+
+        HashMap<Integer, Order> map = new HashMap<>();
+
+        map.put(id, restaurant.getTableOrder(id));
+
+        return new ResponseEntity<>(map, HttpStatus.OK);
+    }
+
+    @RequestMapping(method = RequestMethod.POST)
+    public ResponseEntity<?> postOrder(@RequestBody Map<Integer, Order> order) {
+        try {
+            Set<Integer> tables = order.keySet();
+
+            for (Integer s : tables) {
+
+                restaurant.addNewOrderToTable(order.get(s));
+            }
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (OrderServicesException ex) {
+            Logger.getLogger(OrdersAPIController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.toString(), HttpStatus.METHOD_NOT_ALLOWED);
+        }
+    }
+
+    @RequestMapping(method = RequestMethod.GET, path = "/{idTable}/total")
+    public ResponseEntity<?> getTotalTableBill(@PathVariable int idTable) {
+        try {
+            return new ResponseEntity<>(restaurant.calculateTableBill(idTable), HttpStatus.OK);
+        } catch (OrderServicesException ex) {
+            Logger.getLogger(OrdersAPIController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    @RequestMapping(method = RequestMethod.PUT,path="/{idTable}")
+    public ResponseEntity<?> updateOrder(@PathVariable int idTable,@RequestBody Map<String, Integer> dish) {
         
- 	@RequestMapping(method = RequestMethod.GET)
-        public ResponseEntity<?> getOrders(){
-            System.out.println("______________POLO----------------");
-            //Gson gson = new Gson();
-            HashMap<String, Integer> map = new HashMap<>();
-            map.put("POS",3);
-            map.put("RES",9);
-            //String json = gson.toJson(map);
-            return new ResponseEntity<>(map,HttpStatus.OK);  
- 	}      
- }
+         Set<String> tables = dish.keySet();
+         
+         for (String s : tables) {
+             restaurant.getTableOrder(idTable).addDish(s,dish.get(s));
+            
+         }
+        return new ResponseEntity<>(HttpStatus.OK);
+
+    }
+    
+    @RequestMapping(method = RequestMethod.DELETE, path = "{idTable}")
+    public ResponseEntity<?> deleteOrder(@PathVariable int idTable){
+        try {
+            restaurant.releaseTable(idTable);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (OrderServicesException ex) {
+            Logger.getLogger(OrdersAPIController.class.getName()).log(Level.SEVERE, null, ex);
+            return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+            
+        }
+    }
+    
 }

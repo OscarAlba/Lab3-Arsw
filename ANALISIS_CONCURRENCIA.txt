@@ -1,0 +1,7 @@
+curl -i -X POST -HContent-Type:application/json -HAccept:application/json http://localhost:8080/orders -d '{"2":{"orderAmountsMap":{"PIZZA":3,"COKE":1,"HOTDOG":4},"tableNumber":2},"4":{"orderAmountsMap":{"HOTDOG":2,"BEER":2},"tableNumber":4}}'
+
+
+
+El error de la API es que al realizar varios procesos concurrentes, como por ejemplo modificar ordenes y usar servicios GET al mismo tiempo, podría ocasionar inconsistencias en los resultados.
+
+Para corregir estos errores se debe sincronizar el acceso a los recursos compartidos como por ejemplo a las ordenes registradas en el sistema.
